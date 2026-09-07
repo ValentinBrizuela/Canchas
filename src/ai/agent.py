@@ -65,25 +65,39 @@ class BookingAgent:
                 # Si el modelo no solicita function calls, devolver el texto final
                 if not response.function_calls:
                     assistant_text = response.text or "Entendido."
-                    self.history.append(
-                        types.Content(
-                            role="model",
-                            parts=[types.Part.from_text(text=assistant_text)],
+                    if (
+                        response.candidates
+                        and hasattr(response.candidates[0], "content")
+                        and isinstance(response.candidates[0].content, types.Content)
+                    ):
+                        self.history.append(response.candidates[0].content)
+                    else:
+                        self.history.append(
+                            types.Content(
+                                role="model",
+                                parts=[types.Part.from_text(text=assistant_text)],
+                            )
                         )
-                    )
                     return assistant_text
 
                 # El modelo solicitó invocar herramientas
-                # Agregar la respuesta del modelo al historial
-                model_parts = []
-                for call in response.function_calls:
-                    model_parts.append(
-                        types.Part.from_function_call(
-                            name=call.name,
-                            args=call.args or {},
+                # Preservar candidate.content original para retener thought_signature y metadatos
+                if (
+                    response.candidates
+                    and hasattr(response.candidates[0], "content")
+                    and isinstance(response.candidates[0].content, types.Content)
+                ):
+                    self.history.append(response.candidates[0].content)
+                else:
+                    model_parts = []
+                    for call in response.function_calls:
+                        model_parts.append(
+                            types.Part.from_function_call(
+                                name=call.name,
+                                args=call.args or {},
+                            )
                         )
-                    )
-                self.history.append(types.Content(role="model", parts=model_parts))
+                    self.history.append(types.Content(role="model", parts=model_parts))
 
                 # Ejecutar cada herramienta solicitada y armar las respuestas
                 response_parts = []
