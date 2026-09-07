@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.db.session import Base, TimestampMixin
+from src.db.session import Base, TimestampMixin, UTCDateTime
 
 if TYPE_CHECKING:
     from src.models.cancha import Cancha
@@ -37,12 +37,12 @@ class Reserva(Base, TimestampMixin):
 
     # Franja horaria del turno (en timezone consciente, UTC recomendado)
     fecha_inicio: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         index=True,
         nullable=False,
     )
     fecha_fin: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         nullable=False,
     )
 

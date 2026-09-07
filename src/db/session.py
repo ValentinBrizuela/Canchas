@@ -1,6 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, TypeDecorator
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,6 +12,26 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from src.config import get_settings
 
 
+class UTCDateTime(TypeDecorator):
+    """Garantiza que los datetimes se almacenen y recuperen con tzinfo=timezone.utc."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            else:
+                value = value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+
 class Base(DeclarativeBase):
     """Clase base declarativa para todos los modelos de SQLAlchemy."""
     pass
@@ -21,12 +41,12 @@ class TimestampMixin:
     """Mixin que añade marcas de tiempo creadas y actualizadas en UTC."""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
