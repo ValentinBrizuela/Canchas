@@ -122,3 +122,52 @@ class BookingService:
         await self.session.refresh(reserva)
 
         return reserva
+
+    async def get_customer_bookings(
+        self,
+        telegram_id: int,
+        only_active: bool = True,
+    ) -> list[Reserva]:
+        """Retorna las reservas asociadas a un cliente por su telegram_id."""
+        stmt = (
+            select(Reserva)
+            .join(Reserva.cliente)
+            .where(Cliente.telegram_id == telegram_id)
+            .order_by(Reserva.fecha_inicio.asc())
+        )
+        if only_active:
+            stmt = stmt.where(Reserva.estado == EstadoReserva.CONFIRMADA.value)
+
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def cancel_booking(
+        self,
+        reserva_id: int,
+        telegram_id: int | None = None,
+    ) -> Reserva:
+        """Cancela una reserva activa verificando titularidad si se pasa telegram_id."""
+        stmt = select(Reserva).where(Reserva.id == reserva_id)
+        res = await self.session.execute(stmt)
+        reserva = res.scalar_one_or_none()
+
+        if not reserva:
+            raise BookingNotFoundError(f"No se encontró la reserva #{reserva_id}.")
+
+        if telegram_id is not None:
+            # Cargar cliente para validar titularidad
+            cliente_stmt = select(Cliente).where(Cliente.id == reserva.cliente_id)
+            cliente_res = await self.session.execute(cliente_stmt)
+            cliente = cliente_res.scalar_one_or_none()
+            if not cliente or cliente.telegram_id != telegram_id:
+                raise BookingError("No tienes permiso para cancelar esta reserva.")
+
+        if reserva.estado == EstadoReserva.CANCELADA.value:
+            raise BookingError("La reserva ya se encontraba cancelada.")
+
+        reserva.estado = EstadoReserva.CANCELADA.value
+        await self.session.commit()
+        await self.session.refresh(reserva)
+
+        return reserva
+
