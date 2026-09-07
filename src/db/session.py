@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
+import os
+from pathlib import Path
 from sqlalchemy import DateTime, TypeDecorator
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -57,6 +59,13 @@ def create_engine_and_session(database_url: str | None = None) -> tuple[AsyncEng
     """Crea el engine async y la fábrica de sesiones para la base de datos."""
     settings = get_settings()
     url = database_url or settings.DATABASE_URL
+
+    # Si es SQLite con ruta de archivo relativa/absoluta, asegurar que la carpeta exista
+    if "sqlite" in url and "///" in url and ":memory:" not in url:
+        db_path = url.split("///")[1]
+        parent_dir = Path(db_path).parent
+        if str(parent_dir) not in ("", "."):
+            parent_dir.mkdir(parents=True, exist_ok=True)
 
     # Argumentos específicos para SQLite en modo async
     connect_args = {"check_same_thread": False} if "sqlite" in url else {}
