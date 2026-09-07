@@ -8,6 +8,84 @@ from src.services.availability import AvailabilityService
 from src.services.booking import BookingError, BookingService
 
 
+from google.genai import types
+
+
+def get_booking_tool_declarations() -> list[types.Tool]:
+    """Genera las declaraciones OpenAPI de herramientas para Gemini sin referencias a métodos ligados."""
+    decls = [
+        types.FunctionDeclaration(
+            name="consultar_canchas_y_precios",
+            description="Consulta la lista de canchas del complejo, sus tipos, duración de turno y precios.",
+            parameters=types.Schema(type="OBJECT", properties={}),
+        ),
+        types.FunctionDeclaration(
+            name="consultar_disponibilidad",
+            description="Consulta los turnos y horarios disponibles para reservar en una fecha específica.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "fecha": types.Schema(
+                        type="STRING",
+                        description="Fecha en formato YYYY-MM-DD (por ejemplo '2026-09-10').",
+                    ),
+                    "tipo_cancha": types.Schema(
+                        type="STRING",
+                        description="Tipo o filtro opcional (por ejemplo 'Fútbol 5', 'Fútbol 7', 'Pádel').",
+                    ),
+                },
+                required=["fecha"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="crear_reserva",
+            description="Crea y confirma una reserva de turno para el cliente actual.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "cancha_id": types.Schema(
+                        type="INTEGER",
+                        description="Identificador numérico de la cancha.",
+                    ),
+                    "fecha": types.Schema(
+                        type="STRING",
+                        description="Fecha del turno en formato YYYY-MM-DD (ej: '2026-09-10').",
+                    ),
+                    "hora_inicio": types.Schema(
+                        type="STRING",
+                        description="Hora de inicio del turno en formato HH:MM (ej: '19:00').",
+                    ),
+                    "notas": types.Schema(
+                        type="STRING",
+                        description="Observaciones o notas adicionales de la reserva.",
+                    ),
+                },
+                required=["cancha_id", "fecha", "hora_inicio"],
+            ),
+        ),
+        types.FunctionDeclaration(
+            name="consultar_mis_reservas",
+            description="Consulta todas las reservas activas y confirmadas del cliente actual.",
+            parameters=types.Schema(type="OBJECT", properties={}),
+        ),
+        types.FunctionDeclaration(
+            name="cancelar_reserva",
+            description="Cancela una reserva activa del cliente actual.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "reserva_id": types.Schema(
+                        type="INTEGER",
+                        description="ID numérico de la reserva a cancelar.",
+                    ),
+                },
+                required=["reserva_id"],
+            ),
+        ),
+    ]
+    return [types.Tool(function_declarations=decls)]
+
+
 class BookingTools:
     """Proveedor de herramientas (tools) para el LLM con contexto de usuario y complejo."""
 
@@ -28,11 +106,7 @@ class BookingTools:
         self.booking_service = BookingService(session)
 
     async def consultar_canchas_y_precios(self) -> list[dict[str, Any]]:
-        """Consulta la lista de canchas del complejo, sus tipos, duración de turno y precios.
-
-        Returns:
-            Lista de canchas activas disponibles con sus detalles.
-        """
+        """Consulta la lista de canchas del complejo, sus tipos, duración de turno y precios."""
         stmt = select(Cancha).where(
             Cancha.complejo_id == self.complejo_id,
             Cancha.activa == True,  # noqa: E712
@@ -55,14 +129,7 @@ class BookingTools:
         fecha: str,
         tipo_cancha: str = "",
     ) -> list[dict[str, Any]]:
-        """Consulta los turnos y horarios disponibles para reservar en una fecha específica.
-
-        Args:
-            fecha: Fecha en formato YYYY-MM-DD (por ejemplo '2026-09-10').
-            tipo_cancha: Tipo o filtro opcional (por ejemplo 'Fútbol 5', 'Fútbol 7', 'Pádel').
-        Returns:
-            Lista de turnos libres con horarios y precios.
-        """
+        """Consulta los turnos y horarios disponibles para reservar en una fecha específica."""
         try:
             target_date = date.fromisoformat(fecha)
         except ValueError:
@@ -95,16 +162,7 @@ class BookingTools:
         hora_inicio: str,
         notas: str = "",
     ) -> dict[str, Any]:
-        """Crea y confirma una reserva de turno para el cliente actual.
-
-        Args:
-            cancha_id: Identificador numérico de la cancha.
-            fecha: Fecha del turno en formato YYYY-MM-DD (ej: '2026-09-10').
-            hora_inicio: Hora de inicio del turno en formato HH:MM (ej: '19:00').
-            notas: Observaciones o notas adicionales de la reserva.
-        Returns:
-            Datos de la reserva confirmada o mensaje de error.
-        """
+        """Crea y confirma una reserva de turno para el cliente actual."""
         try:
             d = date.fromisoformat(fecha)
             partes_hora = [int(p) for p in hora_inicio.split(":")]
@@ -136,11 +194,7 @@ class BookingTools:
             return {"status": "error", "error": str(e)}
 
     async def consultar_mis_reservas(self) -> list[dict[str, Any]]:
-        """Consulta todas las reservas activas y confirmadas del cliente actual.
-
-        Returns:
-            Lista de reservas vigentes del cliente.
-        """
+        """Consulta todas las reservas activas y confirmadas del cliente actual."""
         reservas = await self.booking_service.get_customer_bookings(
             telegram_id=self.telegram_id,
             only_active=True,
@@ -159,13 +213,7 @@ class BookingTools:
         ]
 
     async def cancelar_reserva(self, reserva_id: int) -> dict[str, Any]:
-        """Cancela una reserva activa del cliente actual.
-
-        Args:
-            reserva_id: ID numérico de la reserva a cancelar.
-        Returns:
-            Resultado de la cancelación.
-        """
+        """Cancela una reserva activa del cliente actual."""
         try:
             reserva = await self.booking_service.cancel_booking(
                 reserva_id=reserva_id,
@@ -180,11 +228,5 @@ class BookingTools:
             return {"status": "error", "error": str(e)}
 
     def get_tool_declarations(self) -> list[Any]:
-        """Retorna las funciones listas para ser pasadas a Gemini."""
-        return [
-            self.consultar_canchas_y_precios,
-            self.consultar_disponibilidad,
-            self.crear_reserva,
-            self.consultar_mis_reservas,
-            self.cancelar_reserva,
-        ]
+        """Retorna las declaraciones formales de herramientas listas para Gemini."""
+        return get_booking_tool_declarations()

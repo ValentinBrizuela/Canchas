@@ -3,7 +3,7 @@ from src.config import Settings, get_settings
 
 
 def test_settings_default_values():
-    settings = Settings()
+    settings = Settings(_env_file=None)
     assert settings.ENV == "development"
     assert settings.LOG_LEVEL == "INFO"
     assert "canchas.db" in settings.DATABASE_URL
