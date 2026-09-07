@@ -2,12 +2,18 @@ import logging
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
+from src.bot.handlers import chat_router, start_router
+
 logger = logging.getLogger(__name__)
 
 
 def create_dispatcher() -> Dispatcher:
     """Crea y configura el Dispatcher de aiogram con almacenamiento en memoria."""
     dp = Dispatcher(storage=MemoryStorage())
+
+    # Registrar routers de handlers
+    dp.include_router(start_router)
+    dp.include_router(chat_router)
 
     @dp.startup()
     async def on_startup():
