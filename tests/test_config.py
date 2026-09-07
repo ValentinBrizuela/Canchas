@@ -7,7 +7,9 @@ def test_settings_default_values():
     assert settings.ENV == "development"
     assert settings.LOG_LEVEL == "INFO"
     assert "canchas.db" in settings.DATABASE_URL
+    assert settings.AI_PROVIDER == "gemini"
     assert settings.GEMINI_MODEL == "gemini-3.5-flash"
+    assert settings.OPENROUTER_MODEL == "meta-llama/llama-3.3-70b-instruct:free"
     assert settings.DEFAULT_TENANT_SLUG == "demo-complejo"
 
 

@@ -22,9 +22,17 @@ class Settings(BaseSettings):
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
 
+    # Proveedor de IA (gemini u openrouter)
+    AI_PROVIDER: Literal["gemini", "openrouter"] = "gemini"
+
     # Google Gemini AI
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
+
+    # OpenRouter AI
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
     # Multi-tenant / Complejo por defecto
     DEFAULT_TENANT_SLUG: str = "demo-complejo"
