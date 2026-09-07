@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # Google Gemini AI
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_MODEL: str = "gemini-3.5-flash"
 
     # Multi-tenant / Complejo por defecto
     DEFAULT_TENANT_SLUG: str = "demo-complejo"
