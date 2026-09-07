@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "canchas-saas"
+version = "0.1.0"
+description = "SaaS de gestión de canchas deportivas con Telegram y Gemini LLM"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "sqlalchemy>=2.0.30",
+    "aiosqlite>=0.20.0",
+    "aiogram>=3.10.0",
+    "google-genai>=0.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
