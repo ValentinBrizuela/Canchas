@@ -86,6 +86,103 @@ def get_booking_tool_declarations() -> list[types.Tool]:
     return [types.Tool(function_declarations=decls)]
 
 
+def get_openai_tool_declarations() -> list[dict[str, Any]]:
+    """Genera las herramientas en formato estándar compatible con OpenAI y OpenRouter."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "consultar_canchas_y_precios",
+                "description": "Consulta la lista de canchas del complejo, sus tipos, duración de turno y precios.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "consultar_disponibilidad",
+                "description": "Consulta los turnos y horarios disponibles para reservar en una fecha específica.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "fecha": {
+                            "type": "string",
+                            "description": "Fecha en formato YYYY-MM-DD (ej: 2026-09-10).",
+                        },
+                        "tipo_cancha": {
+                            "type": "string",
+                            "description": "Tipo opcional de cancha (ej: Fútbol 5, Fútbol 7, Pádel).",
+                        },
+                    },
+                    "required": ["fecha"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "crear_reserva",
+                "description": "Crea y confirma una reserva de turno para el cliente actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "cancha_id": {
+                            "type": "integer",
+                            "description": "ID numérico de la cancha.",
+                        },
+                        "fecha": {
+                            "type": "string",
+                            "description": "Fecha del turno en formato YYYY-MM-DD (ej: 2026-09-10).",
+                        },
+                        "hora_inicio": {
+                            "type": "string",
+                            "description": "Hora de inicio en formato HH:MM (ej: 19:00).",
+                        },
+                        "notas": {
+                            "type": "string",
+                            "description": "Notas u observaciones adicionales.",
+                        },
+                    },
+                    "required": ["cancha_id", "fecha", "hora_inicio"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "consultar_mis_reservas",
+                "description": "Consulta todas las reservas activas del cliente actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": [],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "cancelar_reserva",
+                "description": "Cancela una reserva activa del cliente actual.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "reserva_id": {
+                            "type": "integer",
+                            "description": "ID numérico de la reserva a cancelar.",
+                        },
+                    },
+                    "required": ["reserva_id"],
+                },
+            },
+        },
+    ]
+
+
 class BookingTools:
     """Proveedor de herramientas (tools) para el LLM con contexto de usuario y complejo."""
 
@@ -230,3 +327,7 @@ class BookingTools:
     def get_tool_declarations(self) -> list[Any]:
         """Retorna las declaraciones formales de herramientas listas para Gemini."""
         return get_booking_tool_declarations()
+
+    def get_openai_tools(self) -> list[dict[str, Any]]:
+        """Retorna las declaraciones de herramientas listas para OpenRouter y OpenAI."""
+        return get_openai_tool_declarations()
