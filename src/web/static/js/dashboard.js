@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const elAgendaGrid = document.getElementById('agenda-grid');
   const elLoadingSpinner = document.getElementById('loading-spinner');
   const elEmptyState = document.getElementById('empty-state');
-  const elFilterChips = document.querySelectorAll('.filter-chip');
+  const elAgendaFilters = document.getElementById('agenda-filters');
 
   // Modales
   const elModalReserva = document.getElementById('modal-reserva');
@@ -119,16 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
       icon.classList.add('spinning');
       loadAgendaAndKpis().finally(() => {
         setTimeout(() => icon.classList.remove('spinning'), 500);
-      });
-    });
-
-    // Filtros de deporte
-    elFilterChips.forEach((chip) => {
-      chip.addEventListener('click', () => {
-        elFilterChips.forEach((c) => c.classList.remove('active'));
-        chip.classList.add('active');
-        state.activeFilter = chip.dataset.filter;
-        renderAgenda();
       });
     });
 
@@ -234,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateKpiDisplay(kpisData);
       }
 
+      updateFilterChips();
       renderAgenda();
     } catch (err) {
       console.error(err);
@@ -252,6 +243,76 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
+  // HELPER DE DEPORTES Y FILTROS DINÁMICOS
+  // =========================================================================
+
+  function getSportClassAndEmoji(tipoRaw) {
+    const tipo = (tipoRaw || '').toLowerCase();
+    if (tipo.includes('fútbol') || tipo.includes('futbol')) {
+      return { sportClass: 'futbol', emoji: '⚽', label: 'Fútbol' };
+    }
+    if (tipo.includes('pádel') || tipo.includes('padel')) {
+      return { sportClass: 'padel', emoji: '🎾', label: 'Pádel' };
+    }
+    if (tipo.includes('tenis')) {
+      return { sportClass: 'tenis', emoji: '🎾', label: 'Tenis' };
+    }
+    if (tipo.includes('básquet') || tipo.includes('basquet') || tipo.includes('basket')) {
+      return { sportClass: 'basquet', emoji: '🏀', label: 'Básquet' };
+    }
+    const cleanLabel = tipoRaw ? tipoRaw.charAt(0).toUpperCase() + tipoRaw.slice(1) : 'Otro';
+    return { sportClass: 'otro', emoji: '🏆', label: cleanLabel };
+  }
+
+  function updateFilterChips() {
+    if (!elAgendaFilters) return;
+
+    // Obtener los deportes únicos presentes en las canchas de la agenda
+    const availableSports = new Map(); // key: sportClass, value: displayLabel
+
+    if (state.agendaData && state.agendaData.canchas_agenda) {
+      state.agendaData.canchas_agenda.forEach((ca) => {
+        const { sportClass, label } = getSportClassAndEmoji(ca.cancha.tipo);
+        if (!availableSports.has(sportClass)) {
+          availableSports.set(sportClass, label);
+        }
+      });
+    }
+
+    // Si el filtro activo ya no existe entre las canchas disponibles, volver a "todas"
+    if (state.activeFilter !== 'todas' && !availableSports.has(state.activeFilter)) {
+      state.activeFilter = 'todas';
+    }
+
+    let chipsHtml = `
+      <button class="filter-chip ${state.activeFilter === 'todas' ? 'active' : ''}" data-filter="todas">
+        Todas las canchas
+      </button>
+    `;
+
+    availableSports.forEach((label, sportKey) => {
+      const isActive = state.activeFilter === sportKey;
+      chipsHtml += `
+        <button class="filter-chip ${isActive ? 'active' : ''}" data-filter="${sportKey}">
+          ${escapeHtml(label)}
+        </button>
+      `;
+    });
+
+    elAgendaFilters.innerHTML = chipsHtml;
+
+    // Conectar eventos click a los chips generados
+    elAgendaFilters.querySelectorAll('.filter-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        elAgendaFilters.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.activeFilter = chip.dataset.filter;
+        renderAgenda();
+      });
+    });
+  }
+
+  // =========================================================================
   // RENDERIZADO DE LA AGENDA
   // =========================================================================
 
@@ -267,7 +328,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Filtrar canchas según chip seleccionado
     const canchasFiltradas = state.agendaData.canchas_agenda.filter((ca) => {
       if (state.activeFilter === 'todas') return true;
-      return ca.cancha.tipo.toLowerCase().includes(state.activeFilter.toLowerCase());
+      const { sportClass } = getSportClassAndEmoji(ca.cancha.tipo);
+      return sportClass === state.activeFilter;
     });
 
     if (!canchasFiltradas.length) {
@@ -290,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
     elAgendaGrid.innerHTML = canchasFiltradas
       .map((ca) => {
         const c = ca.cancha;
-        const sportClass = c.tipo.toLowerCase().includes('fútbol') ? 'futbol' : 'padel';
+        const { sportClass } = getSportClassAndEmoji(c.tipo);
 
         const slotsHtml = ca.slots
           .map((slot) => {
@@ -642,18 +704,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     elCanchasListContainer.innerHTML = canchas
       .map((c) => {
-        const isPadel = c.tipo.toLowerCase().includes('pádel') || c.tipo.toLowerCase().includes('padel');
-        const iconClass = isPadel ? 'padel' : '';
-        const iconEmoji = isPadel ? '🎾' : '⚽';
+        const { sportClass, emoji } = getSportClassAndEmoji(c.tipo);
 
         return `
           <div class="cancha-item-card ${c.activa ? '' : 'is-inactive'}" id="cancha-card-${c.id}">
             <div class="cancha-item-left">
-              <div class="cancha-item-icon ${iconClass}">${iconEmoji}</div>
+              <div class="cancha-item-icon ${sportClass}">${emoji}</div>
               <div class="cancha-item-details">
                 <div class="cancha-item-title-row">
                   <span class="cancha-item-name">${escapeHtml(c.nombre)}</span>
-                  <span class="sport-tag ${isPadel ? 'padel' : 'futbol'}">${escapeHtml(c.tipo)}</span>
+                  <span class="sport-tag ${sportClass}">${escapeHtml(c.tipo)}</span>
                 </div>
                 <div class="cancha-item-meta">
                   <span class="cancha-meta-chip">⏱️ ${c.duracion_minutos} min</span>
