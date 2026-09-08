@@ -16,6 +16,8 @@ dependencies = [
     "aiogram>=3.10.0",
     "google-genai>=0.1.1",
     "openai>=1.30.0",
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
