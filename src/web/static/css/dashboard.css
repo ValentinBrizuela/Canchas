@@ -333,6 +333,35 @@ body {
   to { transform: rotate(360deg); }
 }
 
+.user-session-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.user-session-badge .user-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+.btn-logout {
+  color: var(--text-dim);
+}
+
+.btn-logout:hover {
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* ==========================================================================
    CONTENIDO PRINCIPAL Y KPIS
    ========================================================================== */

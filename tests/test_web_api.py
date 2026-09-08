@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.seed import seed_initial_data
 from src.db.session import get_db
+from src.models.usuario import Usuario
 from src.web.app import create_web_app
+from src.web.auth import get_current_user
 
 
 @pytest.fixture
@@ -21,7 +23,11 @@ async def web_client(db_session: AsyncSession):
     async def override_get_db():
         yield db_session
 
+    async def override_get_current_user():
+        return Usuario(id=1, username="admin", nombre="Administrador", rol="admin", activo=True)
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -48,6 +54,14 @@ async def test_root_and_static_files(web_client):
     css_resp = await client.get("/static/css/dashboard.css")
     assert css_resp.status_code == 200
     assert "--bg-body" in css_resp.text
+
+
+@pytest.mark.asyncio
+async def test_login_page(web_client):
+    client, _ = web_client
+    login_resp = await client.get("/login")
+    assert login_resp.status_code == 200
+    assert "Iniciar Sesión" in login_resp.text
 
 
 @pytest.mark.asyncio

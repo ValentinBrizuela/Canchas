@@ -165,7 +165,9 @@ def _migrate_sqlite_schema(connection) -> None:
 
 async def init_db(target_engine: AsyncEngine | None = None) -> None:
     """Crea todas las tablas registradas en la metadata de Base y ejecuta migraciones."""
+    import src.models  # noqa: F401
     eng = target_engine or engine
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_migrate_sqlite_schema)
+

@@ -4,6 +4,13 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Control de autenticación de sesión
+  const authToken = localStorage.getItem('canchas_token');
+  if (!authToken) {
+    window.location.href = '/login';
+    return;
+  }
+
   // Estado global de la aplicación
   const state = {
     currentDate: getTodayIsoString(),
@@ -22,6 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const elBtnRefresh = document.getElementById('btn-refresh');
   const elBtnNuevaReserva = document.getElementById('btn-nueva-reserva');
   const elComplejoNombre = document.getElementById('complejo-nombre');
+  const elUserDisplayName = document.getElementById('user-display-name');
+  const elBtnLogout = document.getElementById('btn-logout');
 
   // KPIs
   const elKpiCanchas = document.getElementById('kpi-canchas');
@@ -89,11 +98,21 @@ document.addEventListener('DOMContentLoaded', () => {
   async function init() {
     elDateInput.value = state.currentDate;
     setupEventListeners();
+    await loadUserInfo();
     await loadComplejoInfo();
     await loadAgendaAndKpis();
   }
 
   function setupEventListeners() {
+    // Cerrar sesión
+    if (elBtnLogout) {
+      elBtnLogout.addEventListener('click', () => {
+        localStorage.removeItem('canchas_token');
+        localStorage.removeItem('canchas_user');
+        window.location.href = '/login';
+      });
+    }
+
     // Navegación de fecha
     elDateInput.addEventListener('change', (e) => {
       state.currentDate = e.target.value;
@@ -181,13 +200,63 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // =========================================================================
+  // HELPER DE COMUNICACIÓN API CON AUTENTICACIÓN JWT
+  // =========================================================================
+
+  async function apiFetch(url, options = {}) {
+    const token = localStorage.getItem('canchas_token');
+    if (!token) {
+      window.location.href = '/login';
+      return null;
+    }
+    const headers = {
+      ...(options.headers || {}),
+      'Authorization': `Bearer ${token}`,
+    };
+    try {
+      const resp = await fetch(url, { ...options, headers });
+      if (resp.status === 401) {
+        localStorage.removeItem('canchas_token');
+        localStorage.removeItem('canchas_user');
+        window.location.href = '/login';
+        return null;
+      }
+      return resp;
+    } catch (err) {
+      console.error('Error de red al consultar API:', err);
+      throw err;
+    }
+  }
+
+  async function loadUserInfo() {
+    const cachedUser = localStorage.getItem('canchas_user');
+    if (cachedUser) {
+      try {
+        const u = JSON.parse(cachedUser);
+        if (elUserDisplayName) elUserDisplayName.textContent = u.nombre || u.username;
+      } catch (_) {}
+    }
+
+    try {
+      const resp = await apiFetch('/api/v1/auth/me');
+      if (resp && resp.ok) {
+        const user = await resp.json();
+        localStorage.setItem('canchas_user', JSON.stringify(user));
+        if (elUserDisplayName) elUserDisplayName.textContent = user.nombre || user.username;
+      }
+    } catch (e) {
+      console.error('Error al obtener usuario actual:', e);
+    }
+  }
+
+  // =========================================================================
   // CARGA DE DATOS API
   // =========================================================================
 
   async function loadComplejoInfo() {
     try {
-      const resp = await fetch('/api/v1/complejo');
-      if (!resp.ok) throw new Error('Error al cargar complejo');
+      const resp = await apiFetch('/api/v1/complejo');
+      if (!resp || !resp.ok) throw new Error('Error al cargar complejo');
       const data = await resp.json();
       state.complejo = data;
       elComplejoNombre.textContent = data.nombre;
@@ -210,16 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
     elEmptyState.style.display = 'none';
 
     try {
-      // Llamadas concurrentes a agenda y KPIs
+      // Llamadas concurrentes a agenda y KPIs con token de sesión
       const [agendaResp, kpisResp] = await Promise.all([
-        fetch(`/api/v1/agenda?fecha=${state.currentDate}`),
-        fetch(`/api/v1/kpis?fecha=${state.currentDate}`),
+        apiFetch(`/api/v1/agenda?fecha=${state.currentDate}`),
+        apiFetch(`/api/v1/kpis?fecha=${state.currentDate}`),
       ]);
 
-      if (!agendaResp.ok) throw new Error('Error al cargar agenda');
+      if (!agendaResp || !agendaResp.ok) throw new Error('Error al cargar agenda');
       state.agendaData = await agendaResp.json();
 
-      if (kpisResp.ok) {
+      if (kpisResp && kpisResp.ok) {
         const kpisData = await kpisResp.json();
         updateKpiDisplay(kpisData);
       }
@@ -571,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.textContent = 'Guardando...';
 
     try {
-      const resp = await fetch('/api/v1/reservas', {
+      const resp = await apiFetch('/api/v1/reservas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -583,6 +652,8 @@ document.addEventListener('DOMContentLoaded', () => {
           notas: notas,
         }),
       });
+
+      if (!resp) return;
 
       if (!resp.ok) {
         const errData = await resp.json();
@@ -611,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.textContent = 'Bloqueando...';
 
     try {
-      const resp = await fetch('/api/v1/bloqueos', {
+      const resp = await apiFetch('/api/v1/bloqueos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -620,6 +691,8 @@ document.addEventListener('DOMContentLoaded', () => {
           motivo: motivo,
         }),
       });
+
+      if (!resp) return;
 
       if (!resp.ok) {
         const errData = await resp.json();
@@ -650,7 +723,9 @@ document.addEventListener('DOMContentLoaded', () => {
     elBtnCancelarTurnoText.textContent = isBloqueo ? 'Desbloqueando...' : 'Cancelando...';
 
     try {
-      const resp = await fetch(url, { method: 'POST' });
+      const resp = await apiFetch(url, { method: 'POST' });
+      if (!resp) return;
+
       if (!resp.ok) {
         const errData = await resp.json();
         throw new Error(errData.detail || 'Error al procesar la acción');
@@ -677,7 +752,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elCanchasListContainer.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-dim);">Cargando canchas...</div>';
 
     try {
-      const resp = await fetch('/api/v1/canchas');
+      const resp = await apiFetch('/api/v1/canchas');
+      if (!resp) return;
       if (!resp.ok) throw new Error('Error al obtener lista de canchas');
       const canchas = await resp.json();
       state.allCanchas = canchas;
@@ -750,7 +826,8 @@ document.addEventListener('DOMContentLoaded', () => {
     checkbox.disabled = true;
 
     try {
-      const resp = await fetch(`/api/v1/canchas/${canchaId}/toggle`, { method: 'PATCH' });
+      const resp = await apiFetch(`/api/v1/canchas/${canchaId}/toggle`, { method: 'PATCH' });
+      if (!resp) return;
       if (!resp.ok) {
         const err = await resp.json();
         throw new Error(err.detail || 'Error al cambiar estado de la cancha');
@@ -835,11 +912,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = isEdit ? `/api/v1/canchas/${id}` : '/api/v1/canchas';
       const method = isEdit ? 'PUT' : 'POST';
 
-      const resp = await fetch(url, {
+      const resp = await apiFetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      if (!resp) return;
 
       if (!resp.ok) {
         const err = await resp.json();

@@ -10,6 +10,7 @@ from src.db.session import get_db
 from src.models.cancha import Cancha
 from src.models.complejo import Complejo
 from src.models.reserva import EstadoReserva, Reserva
+from src.models.usuario import Usuario
 from src.services.booking import (
     BookingError,
     BookingNotFoundError,
@@ -17,6 +18,7 @@ from src.services.booking import (
     CourtNotFoundError,
     SlotAlreadyBookedError,
 )
+from src.web.auth import create_access_token, get_current_user, verify_password
 from src.web.schemas import (
     AgendaResponse,
     BloqueoIn,
@@ -26,12 +28,16 @@ from src.web.schemas import (
     CanchaUpdateIn,
     ComplejoOut,
     KpiStatsOut,
+    LoginIn,
     ReservaManualIn,
     ReservaOut,
     SlotAgendaOut,
+    TokenOut,
+    UsuarioOut,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["Dashboard"])
+
 
 
 async def get_active_complejo(session: AsyncSession) -> Complejo:
@@ -57,8 +63,45 @@ async def get_active_complejo(session: AsyncSession) -> Complejo:
     return complejo
 
 
+@router.post("/auth/login", response_model=TokenOut)
+async def login(data: LoginIn, session: AsyncSession = Depends(get_db)):
+    """Autentica a un usuario y genera un token JWT de acceso."""
+    stmt = select(Usuario).where(Usuario.username == data.username.strip())
+    res = await session.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if not user or not verify_password(data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario o contraseña incorrectos.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.activo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario inhabilitado. Consulte con el administrador.",
+        )
+
+    access_token = create_access_token(data={"sub": user.username, "user_id": user.id, "rol": user.rol})
+    return TokenOut(
+        access_token=access_token,
+        token_type="bearer",
+        user=UsuarioOut.model_validate(user),
+    )
+
+
+@router.get("/auth/me", response_model=UsuarioOut)
+async def get_me(current_user: Usuario = Depends(get_current_user)):
+    """Retorna los datos del usuario autenticado actual."""
+    return current_user
+
+
 @router.get("/complejo", response_model=ComplejoOut)
-async def get_complejo_actual(session: AsyncSession = Depends(get_db)):
+async def get_complejo_actual(
+    current_user: Usuario = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
     """Retorna información del complejo deportivo activo y sus canchas."""
     complejo = await get_active_complejo(session)
     canchas_stmt = select(Cancha).where(Cancha.complejo_id == complejo.id).order_by(Cancha.id)
@@ -72,6 +115,7 @@ async def get_complejo_actual(session: AsyncSession = Depends(get_db)):
 @router.get("/agenda", response_model=AgendaResponse)
 async def get_agenda(
     fecha: str | None = Query(None, description="Fecha a consultar en formato YYYY-MM-DD"),
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Retorna la matriz completa de turnos por cancha para la fecha especificada."""
@@ -205,10 +249,11 @@ async def get_agenda(
 @router.get("/kpis", response_model=KpiStatsOut)
 async def get_kpis(
     fecha: str | None = Query(None, description="Fecha a consultar en formato YYYY-MM-DD"),
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Calcula las métricas e indicadores de rendimiento clave para el día."""
-    agenda = await get_agenda(fecha=fecha, session=session)
+    agenda = await get_agenda(fecha=fecha, current_user=current_user, session=session)
 
     total_canchas = len(agenda.canchas_agenda)
     reservas_hoy = 0
@@ -241,6 +286,7 @@ async def get_kpis(
 @router.post("/reservas", response_model=ReservaOut, status_code=status.HTTP_201_CREATED)
 async def crear_reserva_manual(
     data: ReservaManualIn,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Crea una reserva de forma manual desde el mostrador del panel web."""
@@ -266,6 +312,7 @@ async def crear_reserva_manual(
 @router.post("/reservas/{reserva_id}/cancelar", response_model=ReservaOut)
 async def cancelar_reserva_admin(
     reserva_id: int,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Cancela una reserva existente sin requerir verificación de telegram_id (rol administrador)."""
@@ -282,6 +329,7 @@ async def cancelar_reserva_admin(
 @router.post("/bloqueos", response_model=ReservaOut, status_code=status.HTTP_201_CREATED)
 async def bloquear_turno_admin(
     data: BloqueoIn,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Bloquea un turno específico por motivos de mantenimiento, lluvia o torneo."""
@@ -304,6 +352,7 @@ async def bloquear_turno_admin(
 @router.post("/bloqueos/{reserva_id}/desbloquear", response_model=ReservaOut)
 async def desbloquear_turno_admin(
     reserva_id: int,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Desbloquea un horario para que vuelva a estar libre en la agenda."""
@@ -318,7 +367,10 @@ async def desbloquear_turno_admin(
 
 
 @router.get("/canchas", response_model=list[CanchaOut])
-async def listar_canchas(session: AsyncSession = Depends(get_db)):
+async def listar_canchas(
+    current_user: Usuario = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
     """Retorna todas las canchas del complejo activo (incluyendo inactivas)."""
     complejo = await get_active_complejo(session)
     stmt = select(Cancha).where(Cancha.complejo_id == complejo.id).order_by(Cancha.id)
@@ -329,6 +381,7 @@ async def listar_canchas(session: AsyncSession = Depends(get_db)):
 @router.post("/canchas", response_model=CanchaOut, status_code=status.HTTP_201_CREATED)
 async def crear_cancha(
     data: CanchaCreateIn,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Crea una nueva cancha asociada al complejo activo."""
@@ -351,6 +404,7 @@ async def crear_cancha(
 async def actualizar_cancha(
     cancha_id: int,
     data: CanchaUpdateIn,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Actualiza datos, duración o tarifa de una cancha existente."""
@@ -380,6 +434,7 @@ async def actualizar_cancha(
 @router.patch("/canchas/{cancha_id}/toggle", response_model=CanchaOut)
 async def alternar_estado_cancha(
     cancha_id: int,
+    current_user: Usuario = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Alterna el estado activa / inactiva de una cancha."""
@@ -394,3 +449,4 @@ async def alternar_estado_cancha(
     await session.commit()
     await session.refresh(cancha)
     return cancha
+

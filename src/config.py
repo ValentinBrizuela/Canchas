@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     DEFAULT_TENANT_SLUG: str = "demo-complejo"
     DEFAULT_TENANT_NAME: str = "Complejo Deportivo Demo"
 
+    # Autenticación y Seguridad (JWT)
+    JWT_SECRET_KEY: str = "canchas-saas-jwt-secret-key-development"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 horas
+    ADMIN_DEFAULT_PASSWORD: str = "admin123"
+
 
 @lru_cache()
 def get_settings() -> Settings:

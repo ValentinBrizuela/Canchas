@@ -40,6 +40,13 @@ def create_web_app() -> FastAPI:
     async def health_check():
         return {"status": "ok", "app": "canchas-saas"}
 
+    @app.get("/login", include_in_schema=False)
+    async def login_page():
+        login_file = STATIC_DIR / "login.html"
+        if login_file.exists():
+            return FileResponse(str(login_file))
+        return FileResponse(str(STATIC_DIR / "index.html"))
+
     @app.get("/", include_in_schema=False)
     async def index():
         index_file = STATIC_DIR / "index.html"

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión - Canchas SaaS</title>
+  <meta name="description" content="Acceso al panel de administración de complejos deportivos Canchas SaaS.">
+  
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    /* Estilos específicos para la vista de Login */
+    .login-wrapper {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      position: relative;
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg), 0 0 35px rgba(16, 185, 129, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      padding: 2.25rem 2rem;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .login-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 4px 18px var(--primary-glow);
+    }
+
+    .login-logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+
+    .login-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .input-field-wrapper {
+      position: relative;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-dim);
+      pointer-events: none;
+      transition: var(--transition-fast);
+    }
+
+    .login-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      font-size: 0.95rem;
+      padding: 0.8rem 1rem 0.8rem 2.75rem;
+      outline: none;
+      transition: var(--transition-fast);
+    }
+
+    .login-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }
+
+    .login-input:focus + .input-icon,
+    .login-input:focus ~ .input-icon {
+      color: var(--primary);
+    }
+
+    .toggle-pwd-btn {
+      position: absolute;
+      right: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 0.25rem;
+    }
+
+    .toggle-pwd-btn:hover {
+      color: var(--text-main);
+    }
+
+    .toggle-pwd-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .btn-login-submit {
+      margin-top: 0.5rem;
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary) 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 0.85rem;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 16px var(--primary-glow);
+      transition: var(--transition-normal);
+    }
+
+    .btn-login-submit:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px var(--primary-glow);
+      filter: brightness(1.08);
+    }
+
+    .btn-login-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .login-error-alert {
+      display: none;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      animation: shake 0.35s ease;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    .demo-hint-box {
+      margin-top: 1.75rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .demo-hint-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      color: var(--cyan-accent);
+    }
+
+    .demo-autofill-btn {
+      background: rgba(6, 182, 212, 0.12);
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      color: var(--cyan-accent);
+      border-radius: var(--radius-sm);
+      padding: 0.2rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .demo-autofill-btn:hover {
+      background: rgba(6, 182, 212, 0.25);
+    }
+
+    .demo-creds-row {
+      display: flex;
+      gap: 1rem;
+      font-family: monospace;
+      color: var(--text-main);
+    }
+
+    .login-footer {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-box">
+      <div class="login-header">
+        <div class="login-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="m4.93 4.93 4.24 4.24"></path>
+            <path d="m14.83 9.17 4.24-4.24"></path>
+            <path d="m14.83 14.83 4.24 4.24"></path>
+            <path d="m9.17 14.83-4.24 4.24"></path>
+            <circle cx="12" cy="12" r="4"></circle>
+          </svg>
+        </div>
+        <h1 class="login-title">Canchas SaaS</h1>
+        <p class="login-subtitle">Ingresa tus credenciales para administrar el complejo</p>
+      </div>
+
+      <div id="login-error" class="login-error-alert" style="display: none;">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span id="login-error-msg">Usuario o contraseña incorrectos</span>
+      </div>
+
+      <form class="login-form" id="login-form" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label for="username" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Usuario</label>
+          <div class="input-field-wrapper">
+            <input type="text" id="username" class="login-input" placeholder="Ej: admin" required autocomplete="username" autofocus>
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password" style="display: block; margin-bottom: 0.4rem; font-size: 0.85rem; font-weight: 500; color: var(--text-muted);">Contraseña</label>
+          <div class="input-field-wrapper">
+            <input type="password" id="password" class="login-input" placeholder="Tu clave de acceso" required autocomplete="current-password">
+            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <button type="button" class="toggle-pwd-btn" id="btn-toggle-pwd" title="Mostrar/Ocultar contraseña">
+              <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-login-submit" id="btn-submit">
+          <span id="btn-submit-text">Iniciar Sesión</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Caja de credenciales de demostración -->
+      <div class="demo-hint-box">
+        <div class="demo-hint-header">
+          <span>Acceso Administrador Demo</span>
+          <button type="button" class="demo-autofill-btn" id="btn-autofill">Autorrellenar</button>
+        </div>
+        <div class="demo-creds-row">
+          <span>Usuario: <strong>admin</strong></span>
+          <span>Clave: <strong>admin123</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <footer class="login-footer">
+      <p>&copy; 2026 Canchas SaaS &bull; Plataforma Inteligente de Gestión Deportiva</p>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Si ya hay token válido, comprobar redirección a la raíz
+      const existingToken = localStorage.getItem('canchas_token');
+      if (existingToken) {
+        // Redirigir al dashboard
+        window.location.href = '/';
+        return;
+      }
+
+      const form = document.getElementById('login-form');
+      const inputUser = document.getElementById('username');
+      const inputPass = document.getElementById('password');
+      const btnSubmit = document.getElementById('btn-submit');
+      const btnSubmitText = document.getElementById('btn-submit-text');
+      const errorBox = document.getElementById('login-error');
+      const errorMsg = document.getElementById('login-error-msg');
+      const btnTogglePwd = document.getElementById('btn-toggle-pwd');
+      const btnAutofill = document.getElementById('btn-autofill');
+
+      // Autofill demo
+      btnAutofill.addEventListener('click', () => {
+        inputUser.value = 'admin';
+        inputPass.value = 'admin123';
+        inputPass.focus();
+      });
+
+      // Toggle ver contraseña
+      btnTogglePwd.addEventListener('click', () => {
+        if (inputPass.type === 'password') {
+          inputPass.type = 'text';
+          btnTogglePwd.innerHTML = `
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+            </svg>
+          `;
+        } else {
+          inputPass.type = 'password';
+          btnTogglePwd.innerHTML = `
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          `;
+        }
+      });
+
+      // Manejar submit
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errorBox.style.display = 'none';
+
+        const username = inputUser.value.trim();
+        const password = inputPass.value;
+
+        if (!username || !password) {
+          showError('Por favor ingresa usuario y contraseña');
+          return;
+        }
+
+        btnSubmit.disabled = true;
+        btnSubmitText.textContent = 'Iniciando sesión...';
+
+        try {
+          const resp = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+
+          const data = await resp.json();
+
+          if (!resp.ok) {
+            throw new Error(data.detail || 'Credenciales inválidas');
+          }
+
+          // Guardar token y datos del usuario
+          localStorage.setItem('canchas_token', data.access_token);
+          localStorage.setItem('canchas_user', JSON.stringify(data.user || data.usuario));
+
+          btnSubmitText.textContent = '¡Bienvenido!';
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 300);
+        } catch (err) {
+          showError(err.message);
+          btnSubmit.disabled = false;
+          btnSubmitText.textContent = 'Iniciar Sesión';
+        }
+      });
+
+      function showError(msg) {
+        errorMsg.textContent = msg;
+        errorBox.style.display = 'flex';
+        // Re-trigger animation
+        errorBox.style.animation = 'none';
+        void errorBox.offsetWidth;
+        errorBox.style.animation = 'shake 0.35s ease';
+      }
+    });
+  </script>
+</body>
+</html>
