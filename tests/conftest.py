@@ -21,3 +21,17 @@ def test_settings() -> Settings:
         DEFAULT_TENANT_SLUG="test-complejo",
         DEFAULT_TENANT_NAME="Complejo de Pruebas",
     )
+
+
+@pytest.fixture
+async def db_session():
+    """Sesión de base de datos aislada en memoria SQLite para tests."""
+    from src.db.session import create_engine_and_session, init_db
+
+    engine, session_factory = create_engine_and_session("sqlite+aiosqlite:///:memory:")
+    await init_db(engine)
+
+    async with session_factory() as session:
+        yield session
+
+    await engine.dispose()
