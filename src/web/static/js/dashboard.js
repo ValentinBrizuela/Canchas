@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     complejo: null,
     agendaData: null,
     selectedTurno: null, // Para modal de detalle / cancelación
+    slotsMap: new Map(),
   };
 
   // Elementos DOM principales
@@ -240,7 +241,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     elEmptyState.style.display = 'none';
-    elAgendaGrid.style.display = 'grid';
+    elAgendaGrid.style.display = 'flex';
+
+    if (canchasFiltradas.length <= 3) {
+      elAgendaGrid.classList.add('few-courts');
+    } else {
+      elAgendaGrid.classList.remove('few-courts');
+    }
+
+    state.slotsMap.clear();
 
     elAgendaGrid.innerHTML = canchasFiltradas
       .map((ca) => {
@@ -250,6 +259,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const slotsHtml = ca.slots
           .map((slot) => {
             const estado = slot.estado; // "libre", "confirmada", "bloqueada"
+
+            if (slot.reserva_id) {
+              state.slotsMap.set(String(slot.reserva_id), {
+                slot,
+                canchaNombre: c.nombre,
+                canchaTipo: c.tipo,
+              });
+            }
 
             let bodyHtml = '';
             let actionButtons = '';
@@ -265,11 +282,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="slot-actions-row">
                   <button class="btn-slot-action btn-action-book" 
                     onclick="window.quickBook(${c.id}, '${slot.fecha_inicio_iso}', '${slot.hora_inicio}', ${slot.precio})">
-                    + Reservar
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Reservar
                   </button>
                   <button class="btn-slot-action btn-action-block" 
-                    onclick="window.quickBlock(${c.id}, '${c.nombre}', '${slot.fecha_inicio_iso}', '${slot.hora_inicio} a ${slot.hora_fin}')">
-                    🔒
+                    onclick="window.quickBlock(${c.id}, '${escapeHtml(c.nombre)}', '${slot.fecha_inicio_iso}', '${slot.hora_inicio} a ${slot.hora_fin}')"
+                    title="Bloquear este horario por mantenimiento o clima">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    Bloquear
                   </button>
                 </div>
               `;
@@ -283,17 +303,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 ${slot.cliente_telefono ? `<div style="font-size: 0.75rem; color: var(--text-dim);">📞 ${escapeHtml(slot.cliente_telefono)}</div>` : ''}
               `;
+              actionButtons = `
+                <div class="slot-actions-row">
+                  <button class="btn-slot-action btn-action-detail" 
+                    onclick="window.openTurnoPorId(${slot.reserva_id})">
+                    Detalles / Cancelar
+                  </button>
+                </div>
+              `;
             } else if (estado === 'bloqueada') {
               bodyHtml = `
                 <div class="slot-info-row">
                   <span class="slot-client-name" style="color: #fcd34d;">🔒 ${escapeHtml(slot.notas || 'Bloqueado')}</span>
                 </div>
               `;
+              actionButtons = `
+                <div class="slot-actions-row">
+                  <button class="btn-slot-action btn-action-unblock" 
+                    onclick="window.quickUnblock(event, ${slot.reserva_id})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                    Desbloquear Horario
+                  </button>
+                </div>
+              `;
             }
 
             const clickAttr =
-              estado !== 'libre'
-                ? `onclick="window.openTurnoDetalle(${JSON.stringify(slot).replace(/"/g, '&quot;')}, '${escapeHtml(c.nombre)}', '${c.tipo}')"`
+              estado !== 'libre' && slot.reserva_id
+                ? `onclick="window.openTurnoPorId(${slot.reserva_id})"`
                 : '';
 
             return `
@@ -345,6 +382,27 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal(elModalBloqueo);
   };
 
+  window.quickUnblock = async function (event, reservaId) {
+    if (event) event.stopPropagation();
+    try {
+      const resp = await fetch(`/api/v1/bloqueos/${reservaId}/desbloquear`, { method: 'POST' });
+      if (!resp.ok) {
+        const errData = await resp.json();
+        throw new Error(errData.detail || 'Error al desbloquear');
+      }
+      showToast('Horario desbloqueado correctamente', 'info');
+      await loadAgendaAndKpis();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  };
+
+  window.openTurnoPorId = function (reservaId) {
+    const data = state.slotsMap.get(String(reservaId));
+    if (!data) return;
+    window.openTurnoDetalle(data.slot, data.canchaNombre, data.canchaTipo);
+  };
+
   window.openTurnoDetalle = function (slot, canchaNombre, canchaTipo) {
     state.selectedTurno = slot;
 
@@ -356,16 +414,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('det-estado').textContent = slot.estado.toUpperCase();
     document.getElementById('det-notas').textContent = slot.notas || 'Sin notas';
 
-    if (slot.estado === 'bloqueada') {
+    const isBloqueo = slot.estado === 'bloqueada';
+    const elBtnIcon = document.getElementById('btn-cancelar-turno-icon');
+
+    if (isBloqueo) {
       document.getElementById('detalle-titulo').textContent = 'Turno Bloqueado';
       document.getElementById('detalle-subtitulo').textContent = 'Horario inhabilitado por el complejo';
       elBtnCancelarTurnoText.textContent = 'Desbloquear Horario';
-      elBtnCancelarTurnoAction.className = 'btn-warning';
+      elBtnCancelarTurnoAction.className = 'btn-action-dialog action-warning';
+      if (elBtnIcon) {
+        elBtnIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>`;
+      }
     } else {
       document.getElementById('detalle-titulo').textContent = 'Detalle de Reserva';
       document.getElementById('detalle-subtitulo').textContent = 'Información registrada en el sistema';
       elBtnCancelarTurnoText.textContent = 'Cancelar Reserva';
-      elBtnCancelarTurnoAction.className = 'btn-danger';
+      elBtnCancelarTurnoAction.className = 'btn-action-dialog action-danger';
+      if (elBtnIcon) {
+        elBtnIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+      }
     }
 
     openModal(elModalDetalle);
@@ -477,15 +544,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const isBloqueo = state.selectedTurno.estado === 'bloqueada';
     const reservaId = state.selectedTurno.reserva_id;
 
-    const confirmMsg = isBloqueo
-      ? '¿Confirmas que deseas desbloquear este turno para que vuelva a estar libre?'
-      : '¿Seguro que deseas cancelar esta reserva? El turno quedará disponible de inmediato.';
-
-    if (!confirm(confirmMsg)) return;
-
     const url = isBloqueo
       ? `/api/v1/bloqueos/${reservaId}/desbloquear`
       : `/api/v1/reservas/${reservaId}/cancelar`;
+
+    elBtnCancelarTurnoAction.disabled = true;
+    elBtnCancelarTurnoText.textContent = isBloqueo ? 'Desbloqueando...' : 'Cancelando...';
 
     try {
       const resp = await fetch(url, { method: 'POST' });
@@ -499,8 +563,12 @@ document.addEventListener('DOMContentLoaded', () => {
       await loadAgendaAndKpis();
     } catch (err) {
       showToast(err.message, 'error');
+    } finally {
+      elBtnCancelarTurnoAction.disabled = false;
+      elBtnCancelarTurnoText.textContent = isBloqueo ? 'Desbloquear Horario' : 'Cancelar Reserva';
     }
   }
+
 
   // =========================================================================
   // UTILIDADES
