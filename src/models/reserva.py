@@ -16,6 +16,7 @@ class EstadoReserva(str, Enum):
     CONFIRMADA = "confirmada"
     CANCELADA = "cancelada"
     COMPLETADA = "completada"
+    BLOQUEADA = "bloqueada"
 
 
 class Reserva(Base, TimestampMixin):
@@ -29,10 +30,10 @@ class Reserva(Base, TimestampMixin):
         index=True,
         nullable=False,
     )
-    cliente_id: Mapped[int] = mapped_column(
+    cliente_id: Mapped[int | None] = mapped_column(
         ForeignKey("clientes.id", ondelete="CASCADE"),
         index=True,
-        nullable=False,
+        nullable=True,
     )
 
     # Franja horaria del turno (en timezone consciente, UTC recomendado)
@@ -60,7 +61,7 @@ class Reserva(Base, TimestampMixin):
 
     # Relaciones
     cancha: Mapped["Cancha"] = relationship("Cancha", back_populates="reservas")
-    cliente: Mapped["Cliente"] = relationship("Cliente", back_populates="reservas")
+    cliente: Mapped["Cliente | None"] = relationship("Cliente", back_populates="reservas")
 
     def __repr__(self) -> str:
         return (

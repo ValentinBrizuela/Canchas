@@ -65,12 +65,12 @@ class AvailabilityService:
 
             reservas_stmt = select(Reserva).where(
                 Reserva.cancha_id == cancha.id,
-                Reserva.estado == EstadoReserva.CONFIRMADA.value,
+                Reserva.estado.in_([EstadoReserva.CONFIRMADA.value, EstadoReserva.BLOQUEADA.value]),
                 Reserva.fecha_inicio >= inicio_dia,
                 Reserva.fecha_inicio < fin_dia,
             )
             reservas_res = await self.session.execute(reservas_stmt)
-            reservas_confirmadas = reservas_res.scalars().all()
+            reservas_ocupadas = reservas_res.scalars().all()
 
             # Horas del complejo
             hora_actual_minutos = complejo.hora_apertura * 60
@@ -91,7 +91,7 @@ class AvailabilityService:
                 # Verificar si se solapa con alguna reserva confirmada
                 solapado = any(
                     reserva.fecha_inicio < slot_fin_dt and reserva.fecha_fin > slot_inicio_dt
-                    for reserva in reservas_confirmadas
+                    for reserva in reservas_ocupadas
                 )
 
                 if not solapado:

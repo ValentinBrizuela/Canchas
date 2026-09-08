@@ -14,11 +14,11 @@ class Cliente(Base, TimestampMixin):
     __tablename__ = "clientes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    telegram_id: Mapped[int] = mapped_column(
+    telegram_id: Mapped[int | None] = mapped_column(
         BigInteger,
         unique=True,
         index=True,
-        nullable=False,
+        nullable=True,
     )
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
     telefono: Mapped[str | None] = mapped_column(String(50), nullable=True)

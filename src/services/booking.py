@@ -88,7 +88,7 @@ class BookingService:
         # 2. Validación estricta anti-solapamiento
         colision_stmt = select(Reserva).where(
             Reserva.cancha_id == cancha_id,
-            Reserva.estado == EstadoReserva.CONFIRMADA.value,
+            Reserva.estado.in_([EstadoReserva.CONFIRMADA.value, EstadoReserva.BLOQUEADA.value]),
             Reserva.fecha_inicio < fecha_fin,
             Reserva.fecha_fin > fecha_inicio,
         )
@@ -96,7 +96,7 @@ class BookingService:
         if colision_res.first():
             raise SlotAlreadyBookedError(
                 f"El turno seleccionado ({fecha_inicio.strftime('%H:%M')} a {fecha_fin.strftime('%H:%M')}) "
-                f"ya se encuentra reservado."
+                f"ya se encuentra reservado u ocupado."
             )
 
         # 3. Obtener o crear cliente
@@ -122,6 +122,125 @@ class BookingService:
         await self.session.refresh(reserva)
 
         return reserva
+
+    async def create_manual_booking(
+        self,
+        cancha_id: int,
+        fecha_inicio: datetime,
+        cliente_nombre: str,
+        cliente_telefono: str | None = None,
+        precio: float | None = None,
+        notas: str | None = None,
+    ) -> Reserva:
+        """Crea una reserva manual desde el panel de administración web."""
+        cancha_stmt = select(Cancha).where(Cancha.id == cancha_id, Cancha.activa == True)  # noqa: E712
+        cancha_res = await self.session.execute(cancha_stmt)
+        cancha = cancha_res.scalar_one_or_none()
+        if not cancha:
+            raise CourtNotFoundError(f"La cancha #{cancha_id} no existe o no está activa.")
+
+        fecha_fin = fecha_inicio + timedelta(minutes=cancha.duracion_minutos)
+
+        # Validación anti-solapamiento
+        colision_stmt = select(Reserva).where(
+            Reserva.cancha_id == cancha_id,
+            Reserva.estado.in_([EstadoReserva.CONFIRMADA.value, EstadoReserva.BLOQUEADA.value]),
+            Reserva.fecha_inicio < fecha_fin,
+            Reserva.fecha_fin > fecha_inicio,
+        )
+        colision_res = await self.session.execute(colision_stmt)
+        if colision_res.first():
+            raise SlotAlreadyBookedError(
+                f"El turno ({fecha_inicio.strftime('%H:%M')} a {fecha_fin.strftime('%H:%M')}) "
+                f"ya está ocupado."
+            )
+
+        # Buscar cliente existente por teléfono o crear uno nuevo
+        cliente = None
+        if cliente_telefono:
+            cliente_stmt = select(Cliente).where(Cliente.telefono == cliente_telefono)
+            c_res = await self.session.execute(cliente_stmt)
+            cliente = c_res.scalar_one_or_none()
+
+        if not cliente:
+            cliente = Cliente(
+                telegram_id=None,
+                nombre=cliente_nombre,
+                telefono=cliente_telefono,
+            )
+            self.session.add(cliente)
+            await self.session.flush()
+
+        reserva = Reserva(
+            cancha_id=cancha.id,
+            cliente_id=cliente.id,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            estado=EstadoReserva.CONFIRMADA.value,
+            precio=precio if precio is not None else cancha.precio,
+            notas=notas,
+        )
+        self.session.add(reserva)
+        await self.session.commit()
+        await self.session.refresh(reserva)
+        return reserva
+
+    async def bloquear_turno(
+        self,
+        cancha_id: int,
+        fecha_inicio: datetime,
+        motivo: str = "Mantenimiento",
+    ) -> Reserva:
+        """Bloquea un turno en la agenda impidiendo que sea reservado."""
+        cancha_stmt = select(Cancha).where(Cancha.id == cancha_id, Cancha.activa == True)  # noqa: E712
+        cancha_res = await self.session.execute(cancha_stmt)
+        cancha = cancha_res.scalar_one_or_none()
+        if not cancha:
+            raise CourtNotFoundError(f"La cancha #{cancha_id} no existe o no está activa.")
+
+        fecha_fin = fecha_inicio + timedelta(minutes=cancha.duracion_minutos)
+
+        colision_stmt = select(Reserva).where(
+            Reserva.cancha_id == cancha_id,
+            Reserva.estado.in_([EstadoReserva.CONFIRMADA.value, EstadoReserva.BLOQUEADA.value]),
+            Reserva.fecha_inicio < fecha_fin,
+            Reserva.fecha_fin > fecha_inicio,
+        )
+        colision_res = await self.session.execute(colision_stmt)
+        if colision_res.first():
+            raise SlotAlreadyBookedError(
+                f"No se puede bloquear: ya existe una reserva o bloqueo en ese horario."
+            )
+
+        bloqueo = Reserva(
+            cancha_id=cancha.id,
+            cliente_id=None,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            estado=EstadoReserva.BLOQUEADA.value,
+            precio=0.0,
+            notas=motivo,
+        )
+        self.session.add(bloqueo)
+        await self.session.commit()
+        await self.session.refresh(bloqueo)
+        return bloqueo
+
+    async def desbloquear_turno(self, reserva_id: int) -> Reserva:
+        """Elimina o cancela un bloqueo activo."""
+        stmt = select(Reserva).where(
+            Reserva.id == reserva_id,
+            Reserva.estado == EstadoReserva.BLOQUEADA.value,
+        )
+        res = await self.session.execute(stmt)
+        bloqueo = res.scalar_one_or_none()
+        if not bloqueo:
+            raise BookingNotFoundError(f"No se encontró un bloqueo activo con ID #{reserva_id}.")
+
+        bloqueo.estado = EstadoReserva.CANCELADA.value
+        await self.session.commit()
+        await self.session.refresh(bloqueo)
+        return bloqueo
 
     async def get_customer_bookings(
         self,
@@ -170,4 +289,5 @@ class BookingService:
         await self.session.refresh(reserva)
 
         return reserva
+
 
