@@ -37,6 +37,20 @@ async def test_health_endpoint(web_client):
 
 
 @pytest.mark.asyncio
+async def test_root_and_static_files(web_client):
+    client, _ = web_client
+    # Debe servir el index.html
+    root_resp = await client.get("/")
+    assert root_resp.status_code == 200
+    assert "Canchas SaaS" in root_resp.text
+
+    # Debe servir el archivo CSS
+    css_resp = await client.get("/static/css/dashboard.css")
+    assert css_resp.status_code == 200
+    assert "--bg-body" in css_resp.text
+
+
+@pytest.mark.asyncio
 async def test_get_complejo(web_client):
     client, complejo = web_client
     response = await client.get("/api/v1/complejo")
