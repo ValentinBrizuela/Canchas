@@ -552,9 +552,8 @@ body {
   background: linear-gradient(180deg, #162238 0%, #0f172a 100%);
   border-bottom: 1px solid var(--border-subtle);
   padding: 1rem 1.25rem;
-  position: sticky;
-  top: 75px;
-  z-index: 10;
+  flex-shrink: 0;
+  position: relative;
 }
 
 .court-title-row {
