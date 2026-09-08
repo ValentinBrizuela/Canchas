@@ -151,3 +151,66 @@ async def test_bloquear_y_desbloquear_turno(web_client):
     resp_unblock = await client.post(f"/api/v1/bloqueos/{bloqueo_id}/desbloquear")
     assert resp_unblock.status_code == 200
     assert resp_unblock.json()["estado"] == "cancelada"
+
+
+@pytest.mark.asyncio
+async def test_listar_crear_editar_y_toggle_canchas(web_client):
+    client, complejo = web_client
+
+    # 1. Listar canchas iniciales
+    resp = await client.get("/api/v1/canchas")
+    assert resp.status_code == 200
+    canchas_list = resp.json()
+    assert len(canchas_list) >= 3
+
+    # 2. Crear una nueva cancha
+    nueva_cancha_data = {
+        "nombre": "Cancha 3 Pádel Panorámica",
+        "tipo": "Pádel",
+        "duracion_minutos": 90,
+        "precio": 25000.0,
+        "activa": True,
+    }
+    create_resp = await client.post("/api/v1/canchas", json=nueva_cancha_data)
+    assert create_resp.status_code == 201
+    nueva_cancha = create_resp.json()
+    cancha_id = nueva_cancha["id"]
+    assert nueva_cancha["nombre"] == "Cancha 3 Pádel Panorámica"
+    assert nueva_cancha["duracion_minutos"] == 90
+    assert nueva_cancha["precio"] == 25000.0
+    assert nueva_cancha["activa"] is True
+
+    # 3. Editar la cancha (cambiar nombre y precio)
+    edit_data = {
+        "nombre": "Cancha 3 Pádel Pro",
+        "precio": 28000.0,
+    }
+    edit_resp = await client.put(f"/api/v1/canchas/{cancha_id}", json=edit_data)
+    assert edit_resp.status_code == 200
+    edit_json = edit_resp.json()
+    assert edit_json["nombre"] == "Cancha 3 Pádel Pro"
+    assert edit_json["precio"] == 28000.0
+    assert edit_json["duracion_minutos"] == 90
+
+    # 4. Desactivar la cancha mediante toggle
+    toggle_resp = await client.patch(f"/api/v1/canchas/{cancha_id}/toggle")
+    assert toggle_resp.status_code == 200
+    assert toggle_resp.json()["activa"] is False
+
+    # Verificar que la cancha inactiva no aparece en la agenda
+    fecha_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    agenda_resp = await client.get(f"/api/v1/agenda?fecha={fecha_str}")
+    assert agenda_resp.status_code == 200
+    canchas_agenda_ids = [ca["cancha"]["id"] for ca in agenda_resp.json()["canchas_agenda"]]
+    assert cancha_id not in canchas_agenda_ids
+
+    # 5. Reactivar la cancha
+    toggle_back_resp = await client.patch(f"/api/v1/canchas/{cancha_id}/toggle")
+    assert toggle_back_resp.status_code == 200
+    assert toggle_back_resp.json()["activa"] is True
+
+    # Verificar que ahora sí aparece en la agenda
+    agenda_resp2 = await client.get(f"/api/v1/agenda?fecha={fecha_str}")
+    canchas_agenda_ids2 = [ca["cancha"]["id"] for ca in agenda_resp2.json()["canchas_agenda"]]
+    assert cancha_id in canchas_agenda_ids2
+

@@ -21,7 +21,9 @@ from src.web.schemas import (
     AgendaResponse,
     BloqueoIn,
     CanchaAgendaOut,
+    CanchaCreateIn,
     CanchaOut,
+    CanchaUpdateIn,
     ComplejoOut,
     KpiStatsOut,
     ReservaManualIn,
@@ -59,7 +61,12 @@ async def get_active_complejo(session: AsyncSession) -> Complejo:
 async def get_complejo_actual(session: AsyncSession = Depends(get_db)):
     """Retorna información del complejo deportivo activo y sus canchas."""
     complejo = await get_active_complejo(session)
-    return complejo
+    canchas_stmt = select(Cancha).where(Cancha.complejo_id == complejo.id).order_by(Cancha.id)
+    res = await session.execute(canchas_stmt)
+    canchas = res.scalars().all()
+    complejo_out = ComplejoOut.model_validate(complejo)
+    complejo_out.canchas = [CanchaOut.model_validate(c) for c in canchas]
+    return complejo_out
 
 
 @router.get("/agenda", response_model=AgendaResponse)
@@ -81,8 +88,14 @@ async def get_agenda(
     inicio_dia = datetime.combine(target_date, time(0, 0), tzinfo=timezone.utc)
     fin_dia = inicio_dia + timedelta(days=1)
 
-    # Filtrar solo canchas activas
-    canchas_activas = [c for c in complejo.canchas if c.activa]
+    # Consultar canchas activas directamente desde la base de datos
+    canchas_stmt = (
+        select(Cancha)
+        .where(Cancha.complejo_id == complejo.id, Cancha.activa == True)  # noqa: E712
+        .order_by(Cancha.id)
+    )
+    res_canchas = await session.execute(canchas_stmt)
+    canchas_activas = res_canchas.scalars().all()
 
     canchas_agenda: list[CanchaAgendaOut] = []
 
@@ -302,3 +315,82 @@ async def desbloquear_turno_admin(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except BookingError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/canchas", response_model=list[CanchaOut])
+async def listar_canchas(session: AsyncSession = Depends(get_db)):
+    """Retorna todas las canchas del complejo activo (incluyendo inactivas)."""
+    complejo = await get_active_complejo(session)
+    stmt = select(Cancha).where(Cancha.complejo_id == complejo.id).order_by(Cancha.id)
+    res = await session.execute(stmt)
+    return res.scalars().all()
+
+
+@router.post("/canchas", response_model=CanchaOut, status_code=status.HTTP_201_CREATED)
+async def crear_cancha(
+    data: CanchaCreateIn,
+    session: AsyncSession = Depends(get_db),
+):
+    """Crea una nueva cancha asociada al complejo activo."""
+    complejo = await get_active_complejo(session)
+    cancha = Cancha(
+        complejo_id=complejo.id,
+        nombre=data.nombre.strip(),
+        tipo=data.tipo.strip(),
+        duracion_minutos=data.duracion_minutos,
+        precio=data.precio,
+        activa=data.activa,
+    )
+    session.add(cancha)
+    await session.commit()
+    await session.refresh(cancha)
+    return cancha
+
+
+@router.put("/canchas/{cancha_id}", response_model=CanchaOut)
+async def actualizar_cancha(
+    cancha_id: int,
+    data: CanchaUpdateIn,
+    session: AsyncSession = Depends(get_db),
+):
+    """Actualiza datos, duración o tarifa de una cancha existente."""
+    complejo = await get_active_complejo(session)
+    stmt = select(Cancha).where(Cancha.id == cancha_id, Cancha.complejo_id == complejo.id)
+    res = await session.execute(stmt)
+    cancha = res.scalar_one_or_none()
+    if not cancha:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Cancha #{cancha_id} no encontrada.")
+
+    if data.nombre is not None:
+        cancha.nombre = data.nombre.strip()
+    if data.tipo is not None:
+        cancha.tipo = data.tipo.strip()
+    if data.duracion_minutos is not None:
+        cancha.duracion_minutos = data.duracion_minutos
+    if data.precio is not None:
+        cancha.precio = data.precio
+    if data.activa is not None:
+        cancha.activa = data.activa
+
+    await session.commit()
+    await session.refresh(cancha)
+    return cancha
+
+
+@router.patch("/canchas/{cancha_id}/toggle", response_model=CanchaOut)
+async def alternar_estado_cancha(
+    cancha_id: int,
+    session: AsyncSession = Depends(get_db),
+):
+    """Alterna el estado activa / inactiva de una cancha."""
+    complejo = await get_active_complejo(session)
+    stmt = select(Cancha).where(Cancha.id == cancha_id, Cancha.complejo_id == complejo.id)
+    res = await session.execute(stmt)
+    cancha = res.scalar_one_or_none()
+    if not cancha:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Cancha #{cancha_id} no encontrada.")
+
+    cancha.activa = not cancha.activa
+    await session.commit()
+    await session.refresh(cancha)
+    return cancha

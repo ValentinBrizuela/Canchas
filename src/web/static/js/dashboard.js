@@ -60,6 +60,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const elBtnCancelarTurnoAction = document.getElementById('btn-cancelar-turno-action');
   const elBtnCancelarTurnoText = document.getElementById('btn-cancelar-turno-text');
 
+  // Gestión de Canchas
+  const elBtnGestionarCanchas = document.getElementById('btn-gestionar-canchas');
+  const elModalCanchas = document.getElementById('modal-canchas');
+  const elBtnCloseCanchas = document.getElementById('btn-close-canchas');
+  const elBtnCloseCanchasAction = document.getElementById('btn-close-canchas-action');
+  const elCanchasListContainer = document.getElementById('canchas-list-container');
+  const elCanchasTotalBadge = document.getElementById('canchas-total-badge');
+  const elBtnNuevaCancha = document.getElementById('btn-nueva-cancha');
+
+  // Formulario Cancha
+  const elModalFormCancha = document.getElementById('modal-form-cancha');
+  const elFormCancha = document.getElementById('form-cancha');
+  const elCanchaEditId = document.getElementById('cancha-edit-id');
+  const elFormCanchaTitle = document.getElementById('form-cancha-title');
+  const elFormCanchaSubtitle = document.getElementById('form-cancha-subtitle');
+  const elCanchaNombre = document.getElementById('cancha-nombre');
+  const elCanchaTipo = document.getElementById('cancha-tipo');
+  const elCanchaDuracion = document.getElementById('cancha-duracion');
+  const elCanchaPrecio = document.getElementById('cancha-precio');
+  const elCanchaActiva = document.getElementById('cancha-activa');
+  const elBtnCloseFormCancha = document.getElementById('btn-close-form-cancha');
+  const elBtnCancelFormCancha = document.getElementById('btn-cancel-form-cancha');
+
   // Inicialización
   init();
 
@@ -137,17 +160,30 @@ document.addEventListener('DOMContentLoaded', () => {
     elBtnCloseDetalleAction.addEventListener('click', () => closeModal(elModalDetalle));
     elBtnCancelarTurnoAction.addEventListener('click', handleCancelarTurnoClick);
 
+    // Gestión de Canchas
+    elBtnGestionarCanchas.addEventListener('click', openModalCanchas);
+    elBtnCloseCanchas.addEventListener('click', () => closeModal(elModalCanchas));
+    elBtnCloseCanchasAction.addEventListener('click', () => closeModal(elModalCanchas));
+    elBtnNuevaCancha.addEventListener('click', () => openModalFormCancha(null));
+
+    // Formulario Cancha
+    elBtnCloseFormCancha.addEventListener('click', () => closeModal(elModalFormCancha));
+    elBtnCancelFormCancha.addEventListener('click', () => closeModal(elModalFormCancha));
+    elFormCancha.addEventListener('submit', handleFormCanchaSubmit);
+
     // Cerrar modales con tecla ESC
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closeModal(elModalReserva);
         closeModal(elModalBloqueo);
         closeModal(elModalDetalle);
+        closeModal(elModalCanchas);
+        closeModal(elModalFormCancha);
       }
     });
 
     // Cerrar al hacer clic en el fondo del modal
-    [elModalReserva, elModalBloqueo, elModalDetalle].forEach((modal) => {
+    [elModalReserva, elModalBloqueo, elModalDetalle, elModalCanchas, elModalFormCancha].forEach((modal) => {
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeModal(modal);
       });
@@ -566,6 +602,203 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       elBtnCancelarTurnoAction.disabled = false;
       elBtnCancelarTurnoText.textContent = isBloqueo ? 'Desbloquear Horario' : 'Cancelar Reserva';
+    }
+  }
+
+
+  // =========================================================================
+  // GESTIÓN DE CANCHAS
+  // =========================================================================
+
+  async function openModalCanchas() {
+    openModal(elModalCanchas);
+    elCanchasListContainer.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-dim);">Cargando canchas...</div>';
+
+    try {
+      const resp = await fetch('/api/v1/canchas');
+      if (!resp.ok) throw new Error('Error al obtener lista de canchas');
+      const canchas = await resp.json();
+      state.allCanchas = canchas;
+      renderCanchasList(canchas);
+    } catch (err) {
+      console.error(err);
+      elCanchasListContainer.innerHTML = `<div style="padding: 2rem; text-align: center; color: var(--danger);">Error al cargar canchas</div>`;
+      showToast(err.message, 'error');
+    }
+  }
+
+  function renderCanchasList(canchas) {
+    if (!canchas || !canchas.length) {
+      elCanchasListContainer.innerHTML = `
+        <div style="padding: 2rem; text-align: center; color: var(--text-dim);">
+          No hay canchas registradas en el complejo. Crea la primera haciendo clic en "Nueva Cancha".
+        </div>
+      `;
+      elCanchasTotalBadge.textContent = '0 canchas';
+      return;
+    }
+
+    elCanchasTotalBadge.textContent = `${canchas.length} cancha${canchas.length === 1 ? '' : 's'} configurada${canchas.length === 1 ? '' : 's'}`;
+
+    elCanchasListContainer.innerHTML = canchas
+      .map((c) => {
+        const isPadel = c.tipo.toLowerCase().includes('pádel') || c.tipo.toLowerCase().includes('padel');
+        const iconClass = isPadel ? 'padel' : '';
+        const iconEmoji = isPadel ? '🎾' : '⚽';
+
+        return `
+          <div class="cancha-item-card ${c.activa ? '' : 'is-inactive'}" id="cancha-card-${c.id}">
+            <div class="cancha-item-left">
+              <div class="cancha-item-icon ${iconClass}">${iconEmoji}</div>
+              <div class="cancha-item-details">
+                <div class="cancha-item-title-row">
+                  <span class="cancha-item-name">${escapeHtml(c.nombre)}</span>
+                  <span class="sport-tag ${isPadel ? 'padel' : 'futbol'}">${escapeHtml(c.tipo)}</span>
+                </div>
+                <div class="cancha-item-meta">
+                  <span class="cancha-meta-chip">⏱️ ${c.duracion_minutos} min</span>
+                  <span class="cancha-meta-chip">💲 $${formatCurrency(c.precio)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="cancha-item-right">
+              <div class="toggle-switch-wrapper" title="Habilitar o inhabilitar cancha en la agenda">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="toggle-cancha-${c.id}" ${c.activa ? 'checked' : ''} onchange="window.handleToggleCancha(event, ${c.id})">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-status-label ${c.activa ? 'active' : 'inactive'}" id="toggle-label-${c.id}">
+                  ${c.activa ? 'Activa' : 'Inactiva'}
+                </span>
+              </div>
+              <button class="btn-edit-cancha" onclick="window.handleEditCancha(${c.id})" title="Editar tarifa o especificaciones">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                Editar
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  window.handleToggleCancha = async function (event, canchaId) {
+    const checkbox = event.target;
+    const card = document.getElementById(`cancha-card-${canchaId}`);
+    const label = document.getElementById(`toggle-label-${canchaId}`);
+
+    checkbox.disabled = true;
+
+    try {
+      const resp = await fetch(`/api/v1/canchas/${canchaId}/toggle`, { method: 'PATCH' });
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || 'Error al cambiar estado de la cancha');
+      }
+      const updated = await resp.json();
+
+      // Actualizar estado en memoria
+      const idx = state.allCanchas?.findIndex((c) => c.id === canchaId);
+      if (idx !== undefined && idx !== -1) {
+        state.allCanchas[idx] = updated;
+      }
+
+      checkbox.checked = updated.activa;
+      if (updated.activa) {
+        card.classList.remove('is-inactive');
+        label.className = 'toggle-status-label active';
+        label.textContent = 'Activa';
+        showToast(`Cancha "${updated.nombre}" activada`, 'success');
+      } else {
+        card.classList.add('is-inactive');
+        label.className = 'toggle-status-label inactive';
+        label.textContent = 'Inactiva';
+        showToast(`Cancha "${updated.nombre}" desactivada de la agenda`, 'info');
+      }
+
+      // Sincronizar selectores y agenda en tiempo real
+      await loadComplejoInfo();
+      await loadAgendaAndKpis();
+    } catch (err) {
+      checkbox.checked = !checkbox.checked; // revertir en caso de fallo
+      showToast(err.message, 'error');
+    } finally {
+      checkbox.disabled = false;
+    }
+  };
+
+  window.handleEditCancha = function (canchaId) {
+    const cancha = state.allCanchas?.find((c) => c.id === canchaId);
+    if (!cancha) return;
+    openModalFormCancha(cancha);
+  };
+
+  function openModalFormCancha(cancha = null) {
+    if (cancha) {
+      elFormCanchaTitle.textContent = 'Editar Cancha';
+      elFormCanchaSubtitle.textContent = `Modifica las especificaciones de ${cancha.nombre}`;
+      elCanchaEditId.value = cancha.id;
+      elCanchaNombre.value = cancha.nombre;
+      elCanchaTipo.value = cancha.tipo;
+      elCanchaDuracion.value = cancha.duracion_minutos;
+      elCanchaPrecio.value = cancha.precio;
+      elCanchaActiva.checked = cancha.activa;
+    } else {
+      elFormCanchaTitle.textContent = 'Nueva Cancha';
+      elFormCanchaSubtitle.textContent = 'Configura los parámetros del espacio deportivo';
+      elFormCancha.reset();
+      elCanchaEditId.value = '';
+      elCanchaDuracion.value = '60';
+      elCanchaActiva.checked = true;
+    }
+    openModal(elModalFormCancha);
+  }
+
+  async function handleFormCanchaSubmit(e) {
+    e.preventDefault();
+    const id = elCanchaEditId.value;
+    const isEdit = Boolean(id);
+
+    const payload = {
+      nombre: elCanchaNombre.value.trim(),
+      tipo: elCanchaTipo.value,
+      duracion_minutos: parseInt(elCanchaDuracion.value),
+      precio: parseFloat(elCanchaPrecio.value),
+      activa: elCanchaActiva.checked,
+    };
+
+    const submitBtn = document.getElementById('btn-submit-cancha');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Guardando...';
+
+    try {
+      const url = isEdit ? `/api/v1/canchas/${id}` : '/api/v1/canchas';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const resp = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.detail || 'Error al guardar la cancha');
+      }
+
+      closeModal(elModalFormCancha);
+      showToast(isEdit ? 'Cancha actualizada con éxito' : 'Cancha creada con éxito', 'success');
+
+      // Actualizar listado en modal de canchas si está activo
+      await openModalCanchas();
+      // Actualizar agenda y KPIs
+      await loadComplejoInfo();
+      await loadAgendaAndKpis();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Guardar Cancha';
     }
   }
 

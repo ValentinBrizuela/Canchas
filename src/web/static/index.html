@@ -59,6 +59,10 @@
 
       <!-- Acciones de barra superior -->
       <div class="nav-actions">
+        <button class="btn-secondary" id="btn-gestionar-canchas" title="Administrar canchas y tarifas">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+          Canchas
+        </button>
         <button class="btn-primary" id="btn-nueva-reserva">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           Nueva Reserva
@@ -313,6 +317,107 @@
         </button>
         <button type="button" class="btn-secondary" id="btn-close-detalle-action">Cerrar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Gestión de Canchas -->
+  <div class="modal-backdrop" id="modal-canchas" aria-hidden="true">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon-badge icon-canchas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+          </div>
+          <div>
+            <h2 class="modal-title">Gestión de Canchas</h2>
+            <p class="modal-subtitle">Administra los espacios deportivos, tarifas y estados</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" id="btn-close-canchas">&times;</button>
+      </div>
+
+      <div class="canchas-panel-body">
+        <div class="canchas-top-bar">
+          <span class="canchas-count" id="canchas-total-badge">Cargando canchas...</span>
+          <button class="btn-primary btn-sm" id="btn-nueva-cancha">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Nueva Cancha
+          </button>
+        </div>
+
+        <div class="canchas-list" id="canchas-list-container">
+          <!-- Items generados dinámicamente -->
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="btn-close-canchas-action">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear / Editar Cancha -->
+  <div class="modal-backdrop" id="modal-form-cancha" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon-badge" id="form-cancha-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line><circle cx="12" cy="12" r="3"></circle></svg>
+          </div>
+          <div>
+            <h2 class="modal-title" id="form-cancha-title">Nueva Cancha</h2>
+            <p class="modal-subtitle" id="form-cancha-subtitle">Configura los parámetros del espacio deportivo</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" id="btn-close-form-cancha">&times;</button>
+      </div>
+      <form id="form-cancha" class="modal-form">
+        <input type="hidden" id="cancha-edit-id" value="">
+        <div class="form-group">
+          <label for="cancha-nombre">Nombre de la Cancha *</label>
+          <input type="text" id="cancha-nombre" class="form-input" placeholder="Ej: Cancha 3 Sintético Techada" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cancha-tipo">Deporte / Tipo *</label>
+            <select id="cancha-tipo" class="form-select" required>
+              <option value="Fútbol 5">Fútbol 5</option>
+              <option value="Fútbol 7">Fútbol 7</option>
+              <option value="Fútbol 11">Fútbol 11</option>
+              <option value="Pádel">Pádel</option>
+              <option value="Tenis">Tenis</option>
+              <option value="Básquet">Básquet</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="cancha-duracion">Duración del Turno *</label>
+            <select id="cancha-duracion" class="form-select" required>
+              <option value="30">30 minutos</option>
+              <option value="45">45 minutos</option>
+              <option value="60" selected>60 minutos</option>
+              <option value="90">90 minutos</option>
+              <option value="120">120 minutos</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cancha-precio">Tarifa por Turno ($) *</label>
+            <input type="number" id="cancha-precio" class="form-input" step="100" min="0" placeholder="22000" required>
+          </div>
+          <div class="form-group checkbox-align-group">
+            <label class="custom-checkbox-label">
+              <input type="checkbox" id="cancha-activa" checked>
+              <span>Habilitada (Activa en agenda)</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btn-cancel-form-cancha">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btn-submit-cancha">Guardar Cancha</button>
+        </div>
+      </form>
     </div>
   </div>
 

@@ -2,7 +2,11 @@ import pytest
 from src.config import Settings, get_settings
 
 
-def test_settings_default_values():
+def test_settings_default_values(monkeypatch):
+    monkeypatch.delenv("AI_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("DEFAULT_TENANT_SLUG", raising=False)
     settings = Settings(_env_file=None)
     assert settings.ENV == "development"
     assert settings.LOG_LEVEL == "INFO"

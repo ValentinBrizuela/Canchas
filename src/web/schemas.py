@@ -14,6 +14,22 @@ class CanchaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CanchaCreateIn(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=100)
+    tipo: str = Field(..., min_length=2, max_length=50)
+    duracion_minutos: int = Field(60, ge=15, le=240)
+    precio: float = Field(..., ge=0)
+    activa: bool = Field(True)
+
+
+class CanchaUpdateIn(BaseModel):
+    nombre: str | None = Field(None, min_length=2, max_length=100)
+    tipo: str | None = Field(None, min_length=2, max_length=50)
+    duracion_minutos: int | None = Field(None, ge=15, le=240)
+    precio: float | None = Field(None, ge=0)
+    activa: bool | None = None
+
+
 class ComplejoOut(BaseModel):
     id: int
     slug: str
