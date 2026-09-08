@@ -21,6 +21,7 @@ def get_openrouter_client(
 
     if not key or key == "tu_openrouter_key_aqui":
         logger.warning("OPENROUTER_API_KEY no configurada o usando valor por defecto.")
+        key = key or "sk-or-placeholder"
 
     return AsyncOpenAI(
         api_key=key,

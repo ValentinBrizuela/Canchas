@@ -29,7 +29,11 @@ class AgentManager:
     @property
     def openrouter_client(self):
         if self._openrouter_client is None:
-            self._openrouter_client = get_openrouter_client()
+            settings = get_settings()
+            self._openrouter_client = get_openrouter_client(
+                api_key=settings.OPENROUTER_API_KEY,
+                base_url=settings.OPENROUTER_BASE_URL,
+            )
         return self._openrouter_client
 
     def get_agent(
