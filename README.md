@@ -1,4 +1,4 @@
-# Canchas SaaS ⚽🎾
+# Canchero ⚽🎾
 
 Plataforma para la gestión y reserva de canchas deportivas, que combina un **Panel Web de Administración** en tiempo real con un **Bot de Telegram conversacional** impulsado por IA (Google Gemini / OpenRouter).
 
